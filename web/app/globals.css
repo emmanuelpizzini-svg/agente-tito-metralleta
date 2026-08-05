@@ -1039,3 +1039,118 @@ tfoot .totals td {
 .wheel-empty { color: var(--muted); }
 .wheel-status { font-size: 14px; font-weight: 600; margin: 4px 0; }
 .wheel-disclaimer { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   TEMA OSCURO (data-theme="dark")
+   Se AÑADE, no se toca el tema claro. Redefine las variables y cubre las
+   superficies hardcodeadas (#fff / #f8f9fb / #101828 …) que no usan var().
+   El panel PRO ya era oscuro a propósito, así que se ve cohesivo.
+   ══════════════════════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  --bg: #0b0f1a;
+  --panel: #131a29;
+  --panel-2: #1b2436;
+  --border: #273246;
+  --border-soft: #1f293a;
+  --text: #e6e9f0;
+  --muted: #93a1bd;
+  --faint: #6b7994;
+  --accent: #5b8cff;
+  --accent-dim: #1e2c4d;
+  --green: #35d07f; --green-dark: #2bb96f; --green-bg: rgba(53,208,127,.14);
+  --red: #ff6b6b; --red-soft: #ff8286; --red-bg: rgba(255,107,107,.14);
+  --amber: #f5b544; --amber-bg: rgba(245,144,9,.14); --amber-border: rgba(245,181,68,.4); --amber-text: #f5c98a;
+  --call: #35d07f; --put: #ff8286;
+  color-scheme: dark;
+}
+
+/* Transición suave al alternar tema (solo color, no layout). */
+html { transition: background-color .35s ease, color .35s ease; }
+.hb, .card, .company, .scpanel, .chart, .chart-loading, .tablewrap,
+thead th, .stat, .mf-tile, .cv-metric, .feed-empty, .pred-summary,
+.hb-search, .hb-tab, .nav-tabs, .nav-tab, .tf-btn, .wheel-preset-tab,
+.theme-fab {
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+
+/* Superficies hardcodeadas → oscuras */
+:root[data-theme="dark"] .hb { background: var(--panel); border-bottom-color: var(--border); }
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .company,
+:root[data-theme="dark"] .chart,
+:root[data-theme="dark"] .chart-loading,
+:root[data-theme="dark"] .tablewrap { background: var(--panel); border-color: var(--border); }
+:root[data-theme="dark"] .tablewrap { background: var(--panel); }
+:root[data-theme="dark"] .scpanel { background: var(--panel); border-color: var(--accent-dim); }
+:root[data-theme="dark"] thead th { background: var(--panel-2); color: var(--muted); }
+:root[data-theme="dark"] .stat,
+:root[data-theme="dark"] .mf-tile,
+:root[data-theme="dark"] .cv-metric,
+:root[data-theme="dark"] .feed-empty,
+:root[data-theme="dark"] .pred-summary,
+:root[data-theme="dark"] .pred-note,
+:root[data-theme="dark"] .sccat.off,
+:root[data-theme="dark"] .news-item { background: var(--panel-2); color: var(--text); }
+:root[data-theme="dark"] .table-total,
+:root[data-theme="dark"] tfoot td { background: var(--panel-2); }
+:root[data-theme="dark"] tbody tr:hover td,
+:root[data-theme="dark"] .feed-row:hover { background: var(--panel-2); }
+:root[data-theme="dark"] tbody tr.unusual td { background: rgba(245,181,68,.14) !important; }
+:root[data-theme="dark"] .logo { background: var(--panel-2); border-color: var(--border); }
+
+/* Inputs y pestañas */
+:root[data-theme="dark"] .hb-search { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+:root[data-theme="dark"] .hb-search:focus { background: var(--panel); border-color: var(--accent); }
+:root[data-theme="dark"] .hb-tab,
+:root[data-theme="dark"] .tf-btn,
+:root[data-theme="dark"] .wheel-preset-tab { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+:root[data-theme="dark"] .hb-tab:hover,
+:root[data-theme="dark"] .tf-btn:hover { background: var(--panel); }
+:root[data-theme="dark"] .nav-tabs { background: var(--panel-2); }
+:root[data-theme="dark"] .nav-tab { color: var(--muted); }
+:root[data-theme="dark"] .nav-tab:hover { background: var(--panel); color: var(--text); }
+/* Estados activos: en oscuro el negro casi no contrasta → usar el acento */
+:root[data-theme="dark"] .nav-tab.on,
+:root[data-theme="dark"] .nav-tab.on:hover,
+:root[data-theme="dark"] .hb-tab.on,
+:root[data-theme="dark"] .tf-btn.on,
+:root[data-theme="dark"] .wheel-preset-tab.on,
+:root[data-theme="dark"] .horizon-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+:root[data-theme="dark"] .hz-tab.on { background: var(--panel); color: var(--text); }
+
+/* Franjas de alerta claras → tenues oscuras */
+:root[data-theme="dark"] .news-flag.conflict,
+:root[data-theme="dark"] .pred-caveat { background: rgba(245,144,9,.12); border-color: var(--amber-border); }
+
+/* ── Botón flotante de tema ──────────────────────────── */
+.theme-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 60;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 10px 16px 10px 13px; border-radius: 999px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 22px rgba(16,24,40,.18);
+  cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
+  transition: transform .18s ease, box-shadow .18s ease,
+              background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+.theme-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(16,24,40,.26); }
+.theme-fab:active { transform: translateY(0) scale(.97); }
+.theme-fab-txt { line-height: 1; }
+.theme-orb { position: relative; width: 20px; height: 20px; flex: 0 0 auto; }
+.theme-orb .ic {
+  position: absolute; inset: 0; width: 20px; height: 20px;
+  transition: opacity .35s ease, transform .5s cubic-bezier(.4,0,.2,1);
+}
+.ic-sun { color: #f5a623; fill: #f5a623; opacity: 1; transform: rotate(0deg) scale(1); }
+.ic-moon { fill: #cbd5e1; opacity: 0; transform: rotate(-70deg) scale(.35); }
+:root[data-theme="dark"] .ic-sun { opacity: 0; transform: rotate(70deg) scale(.35); }
+:root[data-theme="dark"] .ic-moon { opacity: 1; transform: rotate(0deg) scale(1); }
+
+@media (max-width: 640px) {
+  .theme-fab-txt { display: none; }
+  .theme-fab { padding: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html, .theme-fab, .theme-orb .ic, .hb, .card { transition: none; }
+}

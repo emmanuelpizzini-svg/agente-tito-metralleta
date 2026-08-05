@@ -309,8 +309,8 @@ export default function IdeasPage() {
     <main className="ideas-page">
       <div className="hb">
         <div className="hb-brand">
-          <div className="hb-logo">T</div>
-          <div className="hb-name">Tito Metralleta</div>
+          <div className="hb-logo">H</div>
+          <div className="hb-name">HedgeFlow</div>
           <div className="hb-chip">Ideas del mercado</div>
         </div>
         <NavTabs />
