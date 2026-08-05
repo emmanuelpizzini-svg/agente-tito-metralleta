@@ -89,6 +89,9 @@ export default function Dashboard() {
   // Sesgo histórico (memoria) para auto-corregir los targets, y si ya se leyó.
   const [calib, setCalib] = useState<{ biasPct: number | null; samples: number }>({ biasPct: null, samples: 0 });
   const [calibReady, setCalibReady] = useState(false);
+  // Universo de monitoreo diario (forward test): membresía para el botón de agregar.
+  const [monitored, setMonitored] = useState<string[]>([]);
+  const [monBusy, setMonBusy] = useState(false);
 
   const chainEs = useRef<EventSource | null>(null);
   const flowEs = useRef<EventSource | null>(null);
@@ -218,6 +221,35 @@ export default function Dashboard() {
     });
   }, [bars, company, chainMeta, chainRows, convRows, notable, gex]);
 
+  // Universo de monitoreo diario: se carga una vez para saber si el ticker ya está.
+  useEffect(() => {
+    fetch("/api/universe?names=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && Array.isArray(d.tickers)) setMonitored(d.tickers); })
+      .catch(() => {});
+  }, []);
+
+  const toggleMonitor = async () => {
+    if (!ticker || monBusy) return;
+    setMonBusy(true);
+    const isIn = monitored.includes(ticker);
+    try {
+      const res = isIn
+        ? await fetch(`/api/universe?ticker=${encodeURIComponent(ticker)}`, { method: "DELETE" })
+        : await fetch("/api/universe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticker }),
+          });
+      const d = await res.json().catch(() => null);
+      if (d && Array.isArray(d.tickers)) setMonitored(d.tickers);
+    } catch {
+      // silencioso: el estado no cambia si falla
+    } finally {
+      setMonBusy(false);
+    }
+  };
+
   const addStep = (s: string) => setSteps((p) => (p[p.length - 1] === s ? p : [...p, s]));
 
   function runSearch(t: string) {
@@ -335,6 +367,17 @@ export default function Dashboard() {
                   ⚡ Pro
                 </button>
               </div>
+              {/* Agregar/quitar este ticker del monitoreo diario (forward test). */}
+              <button
+                className="rescan"
+                onClick={toggleMonitor}
+                disabled={monBusy}
+                title="El job diario tomará una foto de predicción de este ticker"
+              >
+                {monitored.includes(ticker)
+                  ? "🎯 En monitoreo diario — quitar"
+                  : `➕ Agregar ${ticker} a monitoreo diario`}
+              </button>
             </div>
 
             {view === "estudiante" && (
