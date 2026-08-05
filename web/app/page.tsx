@@ -7,9 +7,8 @@ import type { StructureScore } from "@/lib/structure";
 import type { IvContextScore } from "@/lib/ivcontext";
 import type { ValidationScore } from "@/lib/validation";
 import type { ChainSnapshot } from "@/lib/chainStore";
-import { gexAnalysis, type TradeLite } from "@/lib/gex";
 import { gexHeatmap, type HeatTrade } from "@/lib/gexHeatmap";
-import { predictPro } from "@/lib/prediction";
+import { computeGex, computePrediction, callPctOf } from "@/lib/snapshot";
 import { findLevels, type ChainLevel, type FlowLevel } from "@/lib/levels";
 import { int } from "./format";
 import HeaderBar from "./components/HeaderBar";
@@ -104,35 +103,19 @@ export default function Dashboard() {
 
   // % del premium notable que está en calls — la dirección del dinero que la
   // bandera de contradicción confronta contra las noticias.
-  const callPct = useMemo(() => {
-    if (!convRows || convRows.length === 0) return null;
-    let call = 0, put = 0;
-    for (const r of convRows) {
-      if (r.type === "call") call += r.premium;
-      else if (r.type === "put") put += r.premium;
-    }
-    return call + put > 0 ? Math.round((call / (call + put)) * 100) : null;
-  }, [convRows]);
+  const callPct = useMemo(() => callPctOf(convRows ?? []), [convRows]);
 
   // GEX (Gamma Exposure) — nodos de concentración + predicción (nodo imán).
   // Se calcula una vez con toda la cadena de Massive + los trades reales.
+  // El ensamblado vive en lib/snapshot (compartido con el job diario de backtest).
   const gex = useMemo(() => {
-    if (!chainRows || chainRows.length === 0 || !bars || bars.length === 0) return null;
+    if (!chainRows || !bars || bars.length === 0) return null;
     const spot = company?.price ?? chainMeta?.underlyingPrice ?? bars[bars.length - 1].close;
-    if (!spot || spot <= 0) return null;
-    // Une convicción + inusuales (dedupe por id) como los trades reales.
-    const seen = new Set<number>();
-    const trades: TradeLite[] = [];
-    for (const r of [...(convRows ?? []), ...(unusualRows ?? [])]) {
-      if (seen.has(r.id)) continue;
-      seen.add(r.id);
-      trades.push({ strike: r.strike, type: r.type, premium: r.premium, gamma: r.gamma });
-    }
-    return gexAnalysis({
-      rows: chainRows,
+    return computeGex({
+      chainRows,
       closes: bars.map((b) => b.close),
-      spot,
-      trades,
+      spot: spot ?? 0,
+      tradeRows: [...(convRows ?? []), ...(unusualRows ?? [])],
       convictionScore: conviction?.score ?? null,
       structureScore: structure?.score ?? null,
       lowLiquidity: structure?.notional.lowLiquidity ?? false,
@@ -154,30 +137,21 @@ export default function Dashboard() {
   }, [chainRows, gex, convRows, unusualRows]);
 
   // Prediction Pro — junta los 6 sub-agentes, el mapa GEX y la σ en tres escenarios.
-  const prediction = useMemo(() => {
-    if (!gex || !(gex.spot > 0)) return null;
-    return predictPro({
-      spot: gex.spot,
-      iv: gex.iv,
-      horizonDays,
-      nodes: gex.nodes.map((n) => ({
-        strike: n.strike, concentration: n.concentration, side: n.side, netGex: n.netGex,
-      })),
-      scores: {
-        aggression: aggScore?.score ?? null,
-        conviction: conviction?.score ?? null,
-        unusuality: unusuality?.score ?? null,
-        structure: structure?.score ?? null,
-        ivContext: ivContext?.score ?? null,
-        validation: validation?.score ?? null,
-      },
-      regime: gex.regime,
-      callPct,
-      hitRate: validation?.hitRate.value ?? null,
-      lowLiquidity: gex.lowLiquidity,
-      calibration: calib,
-    });
-  }, [gex, horizonDays, aggScore, conviction, unusuality, structure, ivContext, validation, callPct, calib]);
+  // El ensamblado vive en lib/snapshot (compartido con el job diario de backtest).
+  const prediction = useMemo(() => computePrediction(gex, {
+    horizonDays,
+    scores: {
+      aggression: aggScore?.score ?? null,
+      conviction: conviction?.score ?? null,
+      unusuality: unusuality?.score ?? null,
+      structure: structure?.score ?? null,
+      ivContext: ivContext?.score ?? null,
+      validation: validation?.score ?? null,
+    },
+    callPct,
+    hitRate: validation?.hitRate.value ?? null,
+    calibration: calib,
+  }), [gex, horizonDays, aggScore, conviction, unusuality, structure, ivContext, validation, callPct, calib]);
 
   // Memoria del agente: guarda la predicción del día (una vez por ticker/sesión). El
   // dedupe por fecha ET vive en el servidor, así que reenviar el mismo día no duplica.
