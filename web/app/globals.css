@@ -1122,6 +1122,15 @@ thead th, .stat, .mf-tile, .cv-metric, .feed-empty, .pred-summary,
 :root[data-theme="dark"] .news-flag.conflict,
 :root[data-theme="dark"] .pred-caveat { background: rgba(245,144,9,.12); border-color: var(--amber-border); }
 
+/* Chips/pills que conservan fondo claro (#f2f4f7) en modo oscuro: su texto gris
+   (--muted/--faint) queda ilegible sobre casi-blanco. Se fuerza a texto negro. */
+:root[data-theme="dark"] .hb-chip,
+:root[data-theme="dark"] .company-name .tick,
+:root[data-theme="dark"] .pill.agg-mid,
+:root[data-theme="dark"] .pill.agg-unknown,
+:root[data-theme="dark"] .pill.st-expirado,
+:root[data-theme="dark"] .pill.st-desconocido { color: #101828; }
+
 /* ── Botón flotante de tema ──────────────────────────── */
 .theme-fab {
   position: fixed; right: 20px; bottom: 20px; z-index: 60;
