@@ -46,6 +46,21 @@ function wigglePath(
  * El dibujo lo hace `PriceChart` (SVG propio). Aquí solo se piden las velas y se arman
  * los escenarios: sin overlays ni geometría cazada a mano.
  */
+// Sigue el tema activo (data-theme en <html>) de forma reactiva, para que el chart
+// use su paleta oscura (tooltip, ejes, chips) cuando la app está en oscuro.
+function useThemeMode(): "light" | "dark" {
+  const [mode, setMode] = useState<"light" | "dark">("light");
+  useEffect(() => {
+    const el = document.documentElement;
+    const read = () => setMode(el.getAttribute("data-theme") === "dark" ? "dark" : "light");
+    read();
+    const mo = new MutationObserver(read);
+    mo.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  return mode;
+}
+
 export default function SimpleChart({
   ticker,
   spot,
@@ -62,6 +77,7 @@ export default function SimpleChart({
   levels: LevelsReport | null;
 }) {
   const [bars, setBars] = useState<TfBar[] | null>(null);
+  const theme = useThemeMode();
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +147,7 @@ export default function SimpleChart({
             series={series}
             targets={targets}
             levels={nearLevels}
-            theme="light"
+            theme={theme}
             height="100%"
             animate
           />

@@ -1131,6 +1131,16 @@ thead th, .stat, .mf-tile, .cv-metric, .feed-empty, .pred-summary,
 :root[data-theme="dark"] .pill.st-expirado,
 :root[data-theme="dark"] .pill.st-desconocido { color: #101828; }
 
+/* Superficies claras que faltaban cubrir en oscuro (el texto gris quedaba
+   ilegible sobre casi-blanco): panel "Escaneando…", filas de flujo/feed y el
+   tooltip flotante del gráfico "Flujo notable sobre el precio". */
+:root[data-theme="dark"] .steps { background: var(--panel); border-color: var(--border); }
+:root[data-theme="dark"] .feed-row { background: var(--panel); border-color: var(--border); }
+:root[data-theme="dark"] .flow-legend {
+  background: rgba(13,18,32,.94); border-color: rgba(255,255,255,.14); color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+
 /* ── Botón flotante de tema ──────────────────────────── */
 .theme-fab {
   position: fixed; right: 20px; bottom: 20px; z-index: 60;
