@@ -32,6 +32,25 @@ export function parseOcc(symbol: string): OccInfo | null {
 }
 
 /**
+ * Construye el símbolo OCC desde sus componentes. Es la inversa exacta de `parseOcc`
+ * —round-trip garantizado— y la usa la foto de Robinhood para dar a cada contrato la
+ * misma clave que ya lleva `WatchlistEntry.symbol`, así el casamiento es por igualdad.
+ *
+ * El strike va ×1000 en 8 dígitos (así "$330" → "00330000"); el año en 2 dígitos.
+ */
+export function formatOcc(info: {
+  underlying: string;
+  expiration: string; // YYYY-MM-DD
+  type: "call" | "put";
+  strike: number;
+}): string {
+  const [y, m, d] = info.expiration.split("-");
+  const cp = info.type === "call" ? "C" : "P";
+  const strike8 = String(Math.round(info.strike * 1000)).padStart(8, "0");
+  return `${info.underlying.toUpperCase()}${y.slice(2)}${m}${d}${cp}${strike8}`;
+}
+
+/**
  * Fecha del mercado (ET) para `now`, como epoch de medianoche UTC.
  * Importante: no se puede usar la fecha UTC — después de las ~8 PM ET, UTC ya
  * pasó al día siguiente y los vencimientos se reportarían mal.

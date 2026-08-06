@@ -146,6 +146,17 @@ export interface WatchlistEntry {
   tolerancePctAtEntry: number;
 
   brokerSync: BrokerSync | null;
+
+  /**
+   * Reconciliación bilateral con el broker (ver `watchlistReconcile.ts`):
+   * - `archived` — estaba sincronizado y desapareció de la lista del broker (lo borraste
+   *   allí). Sale de la lista activa PERO conserva la foto del momento; no se borra en duro.
+   * - `imported` — entró desde el broker, no de un ⭐ tuyo, así que no tiene foto del
+   *   momento (los campos de entrada van a 0/null). La UI lo rotula para no confundirlo
+   *   con una decisión tuya.
+   */
+  archived?: boolean;
+  imported?: boolean;
 }
 
 /** Lo mínimo que necesita `buildEntry` — evita acoplar el watchlist al tipo Idea completo. */
@@ -452,6 +463,22 @@ export function markOutboxFailed(
       ? { ...i, failedAt: now.toISOString(), failReason: reason }
       : i,
   );
+}
+
+/**
+ * Las claves que el agente YA empujó al broker. La reconciliación bilateral las necesita
+ * para saber qué entradas estuvieron de verdad en el broker: solo esas se archivan cuando
+ * desaparecen de su lista. Lo nunca sincronizado (p. ej. marcado con broker `none`) no se
+ * toca aunque falte de la foto — su ausencia es lo esperado, no una baja.
+ */
+export function syncedOutbox(items: OutboxItem[], broker: string): string[] {
+  return [
+    ...new Set(
+      items
+        .filter((i) => i.broker === broker && i.syncedAt)
+        .map((i) => outboxKey(i)),
+    ),
+  ];
 }
 
 /** Los aparcados, para que la UI ofrezca volver a marcar ⭐ con el contrato completo. */

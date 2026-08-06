@@ -24,6 +24,7 @@ import {
   markOutboxSynced,
   pendingOutbox,
   removeFromOutbox,
+  syncedOutbox,
   type OutboxItem,
   type OutboxTarget,
 } from "@/lib/watchlist";
@@ -37,6 +38,9 @@ function payload(items: OutboxItem[], broker: string) {
     granularity: brokerById(broker)?.granularity ?? "none",
     pending: pendingOutbox(items, broker),
     failed: failedOutbox(items, broker),
+    // Claves ya empujadas al broker: la reconciliación bilateral solo archiva estas
+    // cuando desaparecen de la lista del broker (ver `watchlistReconcile.ts`).
+    synced: syncedOutbox(items, broker),
     // Para que la UI diga cuándo pasó el drenador por última vez.
     lastSyncedAt:
       items

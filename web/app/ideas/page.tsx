@@ -10,12 +10,15 @@ import NavTabs from "@/app/components/NavTabs";
 import {
   brokerById,
   buildEntry,
+  outboxKey,
   remove,
+  sortEntries,
   upsert,
   type OutboxItem,
   type OutboxTarget,
   type WatchlistEntry,
 } from "@/lib/watchlist";
+import { reconcile, type Mirror } from "@/lib/watchlistReconcile";
 import {
   hasMigrated,
   loadBroker,
@@ -52,6 +55,9 @@ export default function IdeasPage() {
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [failed, setFailed] = useState<OutboxItem[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [mirrorTakenAt, setMirrorTakenAt] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   /** Toda respuesta de /api/watchlist trae el mismo trío; se aplica en un sitio. */
   const applySync = useCallback(
@@ -88,32 +94,72 @@ export default function IdeasPage() {
     saveEntries(next);
   }, []);
 
+  /**
+   * Reconciliación bilateral: compara el watchlist local (siempre `wlRef.current`) contra
+   * la foto de la lista del broker y archiva/importa/des-archiva. Solo aplica a Robinhood
+   * —es su foto—; con otro broker no se toca nada. La lógica pura vive en
+   * `watchlistReconcile.ts`; aquí solo se pasa el estado y se guarda el resultado.
+   */
+  const reconcileMirror = useCallback(
+    (mirror: Mirror | null, synced: string[], pendingItems: OutboxItem[]) => {
+      if (!mirror || mirror.broker !== "robinhood") return;
+      const result = reconcile(
+        wlRef.current,
+        mirror,
+        { syncedSymbols: synced, pendingSymbols: pendingItems.map(outboxKey) },
+        new Date(),
+      );
+      applyWatchlist(sortEntries(result.entries));
+      setMirrorTakenAt(mirror.takenAt);
+    },
+    [applyWatchlist],
+  );
+
   useEffect(() => {
     const b = loadBroker();
     setBroker(b);
     applyWatchlist(loadEntries());
 
-    // Importación única del viejo data/watchlist.json, para no perder lo ya marcado.
-    fetch(`/api/watchlist?broker=${encodeURIComponent(b)}`)
-      .then((r) => r.json())
-      .then((d: {
-        pending: OutboxItem[];
-        failed?: OutboxItem[];
-        lastSyncedAt?: string | null;
-        legacy?: { entries: WatchlistEntry[]; broker: string };
-      }) => {
+    (async () => {
+      let synced: string[] = [];
+      let pendingItems: OutboxItem[] = [];
+      try {
+        const r = await fetch(`/api/watchlist?broker=${encodeURIComponent(b)}`);
+        const d: {
+          pending: OutboxItem[];
+          failed?: OutboxItem[];
+          synced?: string[];
+          lastSyncedAt?: string | null;
+          legacy?: { entries: WatchlistEntry[]; broker: string };
+        } = await r.json();
         applySync(d);
-        if (hasMigrated() || !d.legacy?.entries?.length) return;
-        // Se fusiona sobre lo que haya AHORA, no sobre lo que había al empezar el fetch.
-        applyWatchlist(d.legacy.entries.reduce((acc, e) => upsert(acc, e), wlRef.current));
-        if (d.legacy.broker && d.legacy.broker !== "none" && b === "none") {
-          setBroker(d.legacy.broker);
-          saveBroker(d.legacy.broker);
+        synced = d.synced ?? [];
+        pendingItems = d.pending ?? [];
+        // Importación única del viejo data/watchlist.json, para no perder lo ya marcado.
+        if (!hasMigrated() && d.legacy?.entries?.length) {
+          // Se fusiona sobre lo que haya AHORA, no sobre lo que había al empezar el fetch.
+          applyWatchlist(d.legacy.entries.reduce((acc, e) => upsert(acc, e), wlRef.current));
+          if (d.legacy.broker && d.legacy.broker !== "none" && b === "none") {
+            setBroker(d.legacy.broker);
+            saveBroker(d.legacy.broker);
+          }
+          markMigrated();
         }
-        markMigrated();
-      })
-      .catch(() => null); // sin red el watchlist local ya está cargado
-  }, [applyWatchlist]);
+      } catch {
+        // sin red el watchlist local ya está cargado
+      }
+
+      // Reconciliación bilateral al abrir: solo con Robinhood, contra la última foto.
+      if (b !== "robinhood") return;
+      try {
+        const mr = await fetch("/api/watchlist/mirror");
+        const { mirror } = (await mr.json()) as { mirror: Mirror | null };
+        reconcileMirror(mirror, synced, pendingItems);
+      } catch {
+        // sin foto no se reconcilia — no se archiva nada por una foto ausente
+      }
+    })();
+  }, [applyWatchlist, reconcileMirror, applySync]);
 
   const starred = useMemo(
     () => new Set(watchlist.map((e) => e.symbol)),
@@ -234,6 +280,36 @@ export default function IdeasPage() {
     [broker, applyWatchlist],
   );
 
+  /**
+   * El botón 🔄: lanza la pasada del agente en el servidor local (empuja pendientes + trae
+   * la foto), y con la foto fresca reconcilia el watchlist. Reemplaza pedírmelo por chat.
+   */
+  const doSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/watchlist/sync", { method: "POST" });
+      const d: {
+        error?: string;
+        warning?: string;
+        pending?: OutboxItem[];
+        synced?: string[];
+        mirror?: Mirror | null;
+      } = await res.json();
+      if (!res.ok) {
+        setSyncError(d.error ?? "No se pudo sincronizar.");
+      } else {
+        applySync(d);
+        reconcileMirror(d.mirror ?? null, d.synced ?? [], d.pending ?? []);
+        if (d.warning) setSyncError(d.warning);
+      }
+    } catch {
+      setSyncError("No se pudo contactar el sincronizador local.");
+    } finally {
+      setSyncing(false);
+    }
+  }, [applySync, reconcileMirror]);
+
   const pickView = (v: "estudiante" | "pro") => {
     setView(v);
     window.localStorage.setItem(KEY_VIEW, v);
@@ -325,6 +401,10 @@ export default function IdeasPage() {
           pending={pending}
           failed={failed}
           lastSyncedAt={lastSyncedAt}
+          mirrorTakenAt={mirrorTakenAt}
+          syncing={syncing}
+          syncError={syncError}
+          onSync={doSync}
           onBrokerChange={changeBroker}
           onRemove={unstar}
         />
