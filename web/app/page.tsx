@@ -324,6 +324,14 @@ export default function Dashboard() {
     f.onerror = () => { flowDoneRef.current = true; finish(); f.close(); };
   }
 
+  // Llegar desde /ideas (o un enlace directo) como /?ticker=AAPL arranca el análisis
+  // de ese ticker solo, una vez al montar. Antes abría la vista vacía sin analizar.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("ticker");
+    if (fromUrl) runSearch(fromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const started = steps.length > 0 || company != null || aggScore != null;
 
   // Los promedios de cada sub-agente = las señales del sentiment (y de Prediction Pro).
