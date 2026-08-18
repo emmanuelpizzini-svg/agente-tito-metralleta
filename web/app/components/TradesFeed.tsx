@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { UnusualRow } from "./UnusualityCard";
+import AccuracyPanel, { type Review } from "./AccuracyPanel";
 import RepeatBadge, { buildRepeatCounts, repeatKey } from "./RepeatBadge";
 import { int, money, px, timeET } from "../format";
 
@@ -27,13 +28,30 @@ function signalFor(r: UnusualRow): string {
 }
 
 /**
- * Feed de trades inusuales + pestaña de predicciones (se activa con Prediction Pro).
+ * Feed de trades inusuales + pestaña "Agent Predictions & Accuracy".
  * El Score /100 sale del puntaje de Inusualidad de cada trade (promedio de griegos ×10).
+ * La pestaña de predicciones lee el diario del forward test (GET /api/prediction) y
+ * muestra cada foto guardada contra el precio real — versión Pro de MemoriaCard.
  */
-export default function TradesFeed({ rows }: { rows: UnusualRow[] }) {
+export default function TradesFeed({ rows, ticker }: { rows: UnusualRow[]; ticker: string }) {
   const [tab, setTab] = useState<"trades" | "preds">("trades");
+  const [preds, setPreds] = useState<Review | null>(null);
+  const [predsFailed, setPredsFailed] = useState(false);
   const top = rows.slice(0, 8);
   const repeatCounts = buildRepeatCounts(rows);
+
+  // Perezoso a propósito: no se pide nada hasta abrir la pestaña, y se re-pide al
+  // cambiar de ticker (el estado se resetea para no enseñar el historial de otro).
+  useEffect(() => { setPreds(null); setPredsFailed(false); }, [ticker]);
+  useEffect(() => {
+    if (tab !== "preds" || preds !== null || predsFailed || !ticker) return;
+    let cancelled = false;
+    fetch(`/api/prediction?ticker=${encodeURIComponent(ticker)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("preds"))))
+      .then((d: Review) => { if (!cancelled) setPreds(d); })
+      .catch(() => { if (!cancelled) setPredsFailed(true); });
+    return () => { cancelled = true; };
+  }, [tab, preds, predsFailed, ticker]);
 
   return (
     <section className="card">
@@ -84,12 +102,17 @@ export default function TradesFeed({ rows }: { rows: UnusualRow[] }) {
       )}
 
       {tab === "preds" && (
-        <div className="feed-empty">
-          📈 <b>Prediction Pro — próximamente.</b><br />
-          Aquí verás cada predicción del agente para el ticker y si acertó (hit rate).
-          Se activa cuando estén los 6 sub-agentes; los promedios de las tablas de cada
-          categoría son los que alimentan la predicción.
-        </div>
+        <>
+          <div className="card-sub">
+            Cada foto diaria del agente para {ticker} contra lo que el precio hizo después
+            (horizonte 20 días). Las vencidas puntúan el hit rate; las demás siguen en curso.
+          </div>
+
+          {predsFailed && <div className="feed-empty">No se pudo leer el historial de predicciones.</div>}
+          {!preds && !predsFailed && <div className="feed-empty">Leyendo el historial de {ticker}…</div>}
+
+          {preds && <AccuracyPanel ticker={ticker} r={preds} />}
+        </>
       )}
     </section>
   );

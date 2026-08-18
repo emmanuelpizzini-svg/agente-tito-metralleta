@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PredictionEval, PredictionReview } from "@/lib/predictionStore";
+import type { PredictionEval } from "@/lib/predictionStore";
+import AccuracyPanel, { type Review } from "./AccuracyPanel";
 import { px } from "../format";
-
-type Review = PredictionReview & { total: number };
 
 function fmtDate(d: string): string {
   try {
@@ -42,6 +41,7 @@ function Row({ e }: { e: PredictionEval }) {
 export default function MemoriaCard({ ticker }: { ticker: string }) {
   const [r, setR] = useState<Review | null>(null);
   const [failed, setFailed] = useState(false);
+  const [tab, setTab] = useState<"resumen" | "detalle">("resumen");
 
   useEffect(() => {
     let cancelled = false;
@@ -69,17 +69,28 @@ export default function MemoriaCard({ ticker }: { ticker: string }) {
         </div>
       </div>
 
+      <div className="feed-tabs">
+        <button type="button" className={`hb-tab ${tab === "resumen" ? "on" : ""}`} onClick={() => setTab("resumen")}>
+          Resumen
+        </button>
+        <button type="button" className={`hb-tab ${tab === "detalle" ? "on" : ""}`} onClick={() => setTab("detalle")}>
+          Cada predicción
+        </button>
+      </div>
+
       {!r && <div className="feed-empty">Leyendo la memoria de {ticker}…</div>}
 
-      {r && r.maturedCount === 0 && (
+      {r && tab === "detalle" && <AccuracyPanel ticker={ticker} r={r} />}
+
+      {r && tab === "resumen" && r.maturedCount === 0 && (
         <div className="mem-empty">
           Aún no hay predicciones <b>vencidas</b> para {ticker}
           {r.total > 0 ? ` (${r.total} guardada${r.total === 1 ? "" : "s"}, esperando a que pase el horizonte).` : "."}
-          {" "}Vuelve en unos días para ver qué tan cerca quedó.
+          {" "}Vuelve en unos días para ver qué tan cerca quedó — o mira "Cada predicción" para ver cómo van las que están en curso.
         </div>
       )}
 
-      {r && r.maturedCount > 0 && (
+      {r && tab === "resumen" && r.maturedCount > 0 && (
         <>
           <div className="mem-stats">
             <div className="mem-stat">

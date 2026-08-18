@@ -462,7 +462,7 @@ export default function Dashboard() {
 
             {heatmap && heatmap.cells.length > 0 && <GexHeatmapCard h={heatmap} />}
 
-            {unusualRows && <TradesFeed rows={unusualRows} />}
+            {unusualRows && <TradesFeed rows={unusualRows} ticker={ticker} />}
 
             <div className="disclaimer">
               Las predicciones son estimaciones de IA, no consejo financiero.
