@@ -19,6 +19,31 @@ $base = 'http://localhost:3000'
 New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
 function Log($m) { "$([DateTime]::UtcNow.ToString('o')) $m" | Out-File -FilePath $log -Append -Encoding utf8 }
 
+# ── Cookie de MarketSnack: refrescar ANTES del runner ─────────────────────────
+# "Tito MarketSnack Cookie" corre a las 17:15, 15 min antes de esta tarea — pero si el
+# desktop estaba dormido, el Programador dispara ambas tareas atrasadas A LA VEZ y los
+# primeros tickers corren con la cookie muerta mientras el refresco/auto-login termina
+# (costó AAPL el 14-ago y AAPL–DELL el 17-ago-2026). Correrlo aquí en síncrono cierra la
+# carrera: es idempotente, barato con la sesión viva, y su mutex (profile.lock) hace que
+# coincidir con la tarea de las 17:15 solo espere o ceda, nunca corrompa el perfil.
+# Si falla o no existe (p. ej. en la laptop), se sigue igual: el runner ya sabe omitir
+# tickers sin datos de flujo, que es lo mismo que pasaba antes de este paso.
+$refreshCmd = Join-Path $env:USERPROFILE 'dev\ms-cookie\refresh.cmd'
+if (Test-Path $refreshCmd) {
+  Log 'refrescando cookie de MarketSnack antes del runner'
+  try {
+    $rp = Start-Process -FilePath $refreshCmd -WindowStyle Hidden -PassThru
+    # Peor caso legítimo: espera de lock (90s) + auto-login (~2.5 min). 5 min de tope.
+    if ($rp.WaitForExit(300000)) {
+      Log "refresco de cookie terminado (exit $($rp.ExitCode))"
+    } else {
+      Log 'refresco de cookie no terminó en 5 min: se sigue con la cookie actual'
+    }
+  } catch { Log "refresco de cookie falló: $_" }
+} else {
+  Log 'sin refrescador de cookie en esta máquina (dev\ms-cookie): se sigue sin refrescar'
+}
+
 # ¿Responde el server Y tiene la ruta /api/snapshot? La ruta devuelve 400 (falta ticker)
 # cuando existe; un server viejo SIN la ruta devuelve 404. Solo 200/400 cuentan como
 # "arriba y correcto" — así no reusamos por error un server obsoleto (p. ej. arrancado
